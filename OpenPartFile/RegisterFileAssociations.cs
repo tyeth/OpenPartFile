@@ -89,7 +89,7 @@ namespace OpenPartFile
             madeChanges |= SetKeyDefaultValue(@"Software\Classes\" + extension, progId);
             madeChanges |= SetKeyDefaultValue(@"Software\Classes\" + progId, fileTypeDescription);
             madeChanges |= SetKeyDefaultValue($@"Software\Classes\{progId}\shell\open\command",
-                "\"" + applicationFilePath + "\" \"%1\"");
+                "\"" + applicationFilePath + "\" /q \"%1\"");
             return madeChanges;
         }
 
