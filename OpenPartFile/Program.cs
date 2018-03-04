@@ -27,14 +27,6 @@ namespace OpenPartFile
             IntPtr lpSecurityAttributes
         );
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern uint GetConsoleProcessList(
-            uint[] ProcessList,
-            uint ProcessCount
-        );
-
-
-
         enum OutputType
         {
             None = 0,
@@ -44,67 +36,29 @@ namespace OpenPartFile
             Log = 4
         }
 
-        private static OutputType OUTPUT_TYPE = OutputType.Form;
+        private static OutputType OUTPUT_TYPE = OutputType.Log;
         static int SYMLINK_FLAG_DIRECTORY = 1;
         private static readonly IEnumerable<string> FILETYPES = new List<string>() { ".temp", ".tmp", ".part", ".crdownload" };
-
-
-        static bool GetConsoleCountAndReturnTrueIfInConsoleMode()
-        {
-            string msg = "";
-
-            try
-            {
-
-                uint[] procIDs = new uint[64];
-
-                var count = GetConsoleProcessList(procIDs, 64);
-                msg+=($"\r\n****({Process.GetCurrentProcess().Id})***** " + count + "****** \r\n");
-                msg+=(string.Join(" ", procIDs));
-                msg+=("\r\n**end*of*--* " + count + "****** \r\n");
-                if (count > 1) return true;
-            }
-            catch
-            {
-
-            }
-
-            try
-            {
-                var count = GetConsoleProcessList(null, 0);
-                msg+=("\r\n*******2nd*count******* " + count + "***END*** \r\n");
-                if (count > 1) return true;
-            }
-            catch (Exception e)
-            { }
-            Program.LogOutput(msg);
-            return false;
-        }
-
 
 
         [STAThread]
 
         static void Main(string[] args)
         {
-            //if (Debugger.IsAttached == false)
-            //{
-            //    Debugger.Launch();
-            //    Debugger.Break();
-            //}
-
             if (args.Length < 1)
             {
                 LogOutput("No arguments supplied. e.g.  OpenPartFile.exe \"myvideo.mkv.part\"");
                 return;
             }
 
-            //if (GetConsoleCountAndReturnTrueIfInConsoleMode()
-            //    || args.Contains("/C", StringComparer.InvariantCultureIgnoreCase)
-            //    || args.Contains("/console", StringComparer.InvariantCultureIgnoreCase))
-            //{
-            //    OUTPUT_TYPE = OutputType.Console;
-            //}
+            if (args.Contains("/C", StringComparer.InvariantCultureIgnoreCase) || args.Contains("/console", StringComparer.InvariantCultureIgnoreCase))
+            {
+                OUTPUT_TYPE = OutputType.Console;
+            }
+            if (args.Contains("/Q", StringComparer.InvariantCultureIgnoreCase) || args.Contains("/quiet", StringComparer.InvariantCultureIgnoreCase))
+            {
+                OUTPUT_TYPE = OutputType.None;
+            }
 
             if (args[0].ToLowerInvariant() == "/install")
             {
@@ -112,7 +66,7 @@ namespace OpenPartFile
                 return;
             }
 
-            var filePath = CheckFilePath(String.Join(" ", args));
+            var filePath = CheckFilePath(String.Join(" ", args.Where(x=>!x.StartsWith("/"))));
             var suffix = "";
             suffix = CheckForSuffix(filePath, suffix);
             if (suffix == "")
