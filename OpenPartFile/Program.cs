@@ -15,10 +15,11 @@ using System.Windows.Forms;
 namespace OpenPartFile
 {
 
-   static  class Program
+    static class Program
     {
         [DllImport("kernel32.dll")]
         static extern bool CreateSymbolicLink(string lpSymlinkFileName, string lpTargetFileName, int dwFlags);
+
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode)]
         static extern bool CreateHardLink(
             string lpFileName,
@@ -26,21 +27,64 @@ namespace OpenPartFile
             IntPtr lpSecurityAttributes
         );
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern uint GetConsoleProcessList(
+            uint[] ProcessList,
+            uint ProcessCount
+        );
+
+
 
         enum OutputType
         {
-            None=0,
-            MsgBox=1,
-            Console=2,
-            Log=4
+            None = 0,
+            Form = 1,
+            MsgBox = 1,
+            Console = 2,
+            Log = 4
         }
 
-        private static OutputType OUTPUT_TYPE = OutputType.None;
+        private static OutputType OUTPUT_TYPE = OutputType.Form;
         static int SYMLINK_FLAG_DIRECTORY = 1;
         private static readonly IEnumerable<string> FILETYPES = new List<string>() { ".temp", ".tmp", ".part", ".crdownload" };
 
-  [STAThread]
-  
+
+        static bool GetConsoleCountAndReturnTrueIfInConsoleMode()
+        {
+            string msg = "";
+
+            try
+            {
+
+                uint[] procIDs = new uint[64];
+
+                var count = GetConsoleProcessList(procIDs, 64);
+                msg+=($"\r\n****({Process.GetCurrentProcess().Id})***** " + count + "****** \r\n");
+                msg+=(string.Join(" ", procIDs));
+                msg+=("\r\n**end*of*--* " + count + "****** \r\n");
+                if (count > 1) return true;
+            }
+            catch
+            {
+
+            }
+
+            try
+            {
+                var count = GetConsoleProcessList(null, 0);
+                msg+=("\r\n*******2nd*count******* " + count + "***END*** \r\n");
+                if (count > 1) return true;
+            }
+            catch (Exception e)
+            { }
+            Program.LogOutput(msg);
+            return false;
+        }
+
+
+
+        [STAThread]
+
         static void Main(string[] args)
         {
             //if (Debugger.IsAttached == false)
@@ -55,13 +99,20 @@ namespace OpenPartFile
                 return;
             }
 
+            //if (GetConsoleCountAndReturnTrueIfInConsoleMode()
+            //    || args.Contains("/C", StringComparer.InvariantCultureIgnoreCase)
+            //    || args.Contains("/console", StringComparer.InvariantCultureIgnoreCase))
+            //{
+            //    OUTPUT_TYPE = OutputType.Console;
+            //}
+
             if (args[0].ToLowerInvariant() == "/install")
             {
                 SetupAssociations();
                 return;
             }
 
-            var filePath = CheckFilePath(String.Join(" ",args));
+            var filePath = CheckFilePath(String.Join(" ", args));
             var suffix = "";
             suffix = CheckForSuffix(filePath, suffix);
             if (suffix == "")
@@ -70,14 +121,14 @@ namespace OpenPartFile
                 return;
             }
 
-            var newLink = Path.Combine(Path.GetDirectoryName(filePath) , "tmpLink_"
+            var newLink = Path.Combine(Path.GetDirectoryName(filePath), "tmpLink_"
                 + Path.GetFileNameWithoutExtension(filePath));
 
             if (!File.Exists(newLink))
             {
-                LogOutput($">mklink {newLink} {filePath}"  );
+                LogOutput($">mklink {newLink} {filePath}");
                 if (CreateLink(/*"\""+*/newLink/*.Replace(" ","\\ ")*/ /*+ "\""*/ , /*"\""+*/filePath/*.Replace(" ", "\\ ")*/ /*+ "\""*/ , 0))
-                    LogOutput($"symbolic link created for {newLink } <<===>> { filePath}" );
+                    LogOutput($"symbolic link created for {newLink } <<===>> { filePath}");
                 else
                 {
                     LogOutput($"Failed to create file {newLink}. Attempting to use temp folder...");
@@ -87,10 +138,10 @@ namespace OpenPartFile
                     if (!File.Exists(newLink))
                     {
 
-                        LogOutput($">mklink {newLink} {filePath}" );
+                        LogOutput($">mklink {newLink} {filePath}");
 
                         if (CreateLink(/*"\""+*/newLink/*+"\""*/  , /*"\""+*/filePath/*+"\"" */, 0))
-                            LogOutput($"symbolic link created for {newLink} <<===>> {filePath}" );
+                            LogOutput($"symbolic link created for {newLink} <<===>> {filePath}");
                         else
                         {
                             LogOutput($"Failed to create file {newLink}. Aborting...");
@@ -102,17 +153,17 @@ namespace OpenPartFile
             }
 
             var startUsingDefaultProgram = false;
-            MessageBox.Show($"Attempting to load {(startUsingDefaultProgram?"default application": "Open-With dialog")} for {newLink}");
-            OpenAs(filename: newLink,startUsingDefaultProgram: startUsingDefaultProgram);
+            MessageBox.Show($"Attempting to load {(startUsingDefaultProgram ? "default application" : "Open-With dialog")} for {newLink}");
+            OpenAs(filename: newLink, startUsingDefaultProgram: startUsingDefaultProgram);
 
         }
 
-        static void OpenAs(string filename,bool startUsingDefaultProgram=false)
+        static void OpenAs(string filename, bool startUsingDefaultProgram = false)
         {
             var filePath = CheckFilePath(filename);
-            if(startUsingDefaultProgram) Process.Start("\""+filePath+"\"");
+            if (startUsingDefaultProgram) Process.Start("\"" + filePath + "\"");
             else Process.Start("rundll32.exe", "shell32.dll, OpenAs_RunDLL " + filePath);
-        }   
+        }
 
 
         private static void SetupAssociations()
@@ -122,7 +173,7 @@ namespace OpenPartFile
             {
                 FileAssociations.EnsureAssociationsSet(FILETYPES);
 
-                
+
             }
             catch (Exception e)
             {
@@ -140,15 +191,15 @@ namespace OpenPartFile
         /// <param name="type">0 = file, 1=dir, only with symbolic</param>
         /// <param name="hard"></param>
         /// <returns></returns>
-        private static bool CreateLink(string lnk, string target, int type=0, bool hard = true)
+        private static bool CreateLink(string lnk, string target, int type = 0, bool hard = true)
         {
             if (hard)
             {
-               return CreateHardLink(lnk, target, IntPtr.Zero);
+                return CreateHardLink(lnk, target, IntPtr.Zero);
             }
             else
             {
-              return  CreateSymbolicLink(lnk, target, type);
+                return CreateSymbolicLink(lnk, target, type);
             }
         }
 
@@ -191,7 +242,7 @@ namespace OpenPartFile
 
 
                         ;
-                    LogOutput("File not found.\r\n"+msg);
+                    LogOutput("File not found.\r\n" + msg);
                     throw new FileNotFoundException(msg);
                 }
             }
@@ -206,27 +257,28 @@ namespace OpenPartFile
 
         public static void LogOutput(string msg)
         {
-            switch (OUTPUT_TYPE)
+            try
             {
-                case OutputType.Console:
-                case OutputType.Log:
-                case OutputType.MsgBox:
-                case OutputType.None:
-                    try
-                    {
-                        System.Windows.Forms.MessageBox.Show(msg);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.Print(msg);
-                        Debug.Fail(e.Message,e.InnerException?.Message);
-                    }
-                    break;
-                    
+                switch (OUTPUT_TYPE)
+                {
+                    case OutputType.Console:
+                    case OutputType.Log:
+                        Console.WriteLine(msg);
+                        break;
 
+                    case OutputType.MsgBox: // MsgBox or Form
+                        System.Windows.Forms.MessageBox.Show(msg);
+                        break;
+
+                    case OutputType.None:
                     default:
-                    break;
-                    
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.Print(msg);
+                Debug.Fail(e.Message, e.InnerException?.Message);
             }
         }
     }
