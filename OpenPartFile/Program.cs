@@ -25,8 +25,17 @@ namespace OpenPartFile
             string lpExistingFileName,
             IntPtr lpSecurityAttributes
         );
-        
 
+
+        enum OutputType
+        {
+            None=0,
+            MsgBox=1,
+            Console=2,
+            Log=4
+        }
+
+        private static OutputType OUTPUT_TYPE = OutputType.None;
         static int SYMLINK_FLAG_DIRECTORY = 1;
         private static readonly IEnumerable<string> FILETYPES = new List<string>() { ".temp", ".tmp", ".part", ".crdownload" };
 
@@ -42,7 +51,7 @@ namespace OpenPartFile
 
             if (args.Length < 1)
             {
-                System.Windows.Forms.MessageBox.Show("No arguments supplied. e.g.  OpenPartFile.exe \"myvideo.mkv.part\"");
+                LogOutput("No arguments supplied. e.g.  OpenPartFile.exe \"myvideo.mkv.part\"");
                 return;
             }
 
@@ -57,7 +66,7 @@ namespace OpenPartFile
             suffix = CheckForSuffix(filePath, suffix);
             if (suffix == "")
             {
-                System.Windows.Forms.MessageBox.Show($"Only {String.Join(" , ", FILETYPES)} files are supported.");
+                LogOutput($"Only {String.Join(" , ", FILETYPES)} files are supported.");
                 return;
             }
 
@@ -66,25 +75,25 @@ namespace OpenPartFile
 
             if (!File.Exists(newLink))
             {
-                System.Windows.Forms.MessageBox.Show($">mklink {newLink} {filePath}"  );
+                LogOutput($">mklink {newLink} {filePath}"  );
                 if (CreateLink(/*"\""+*/newLink/*.Replace(" ","\\ ")*/ /*+ "\""*/ , /*"\""+*/filePath/*.Replace(" ", "\\ ")*/ /*+ "\""*/ , 0))
-                    System.Windows.Forms.MessageBox.Show($"symbolic link created for {newLink } <<===>> { filePath}" );
+                    LogOutput($"symbolic link created for {newLink } <<===>> { filePath}" );
                 else
                 {
-                    System.Windows.Forms.MessageBox.Show($"Failed to create file {newLink}. Attempting to use temp folder...");
+                    LogOutput($"Failed to create file {newLink}. Attempting to use temp folder...");
                     newLink = Path.Combine(Path.GetTempPath(), "tmpLink_"
                         + Path.GetFileNameWithoutExtension(filePath));
 
                     if (!File.Exists(newLink))
                     {
 
-                        System.Windows.Forms.MessageBox.Show($">mklink {newLink} {filePath}" );
+                        LogOutput($">mklink {newLink} {filePath}" );
 
                         if (CreateLink(/*"\""+*/newLink/*+"\""*/  , /*"\""+*/filePath/*+"\"" */, 0))
-                            System.Windows.Forms.MessageBox.Show($"symbolic link created for {newLink} <<===>> {filePath}" );
+                            LogOutput($"symbolic link created for {newLink} <<===>> {filePath}" );
                         else
                         {
-                            System.Windows.Forms.MessageBox.Show($"Failed to create file {newLink}. Aborting...");
+                            LogOutput($"Failed to create file {newLink}. Aborting...");
                             return;
                         }
                     }
@@ -108,20 +117,18 @@ namespace OpenPartFile
 
         private static void SetupAssociations()
         {
-            System.Windows.Forms.MessageBox.Show("Setting up associations:");
+            LogOutput("Setting up associations:");
             try
             {
-                foreach (var filetype in FILETYPES)
-                {
-                    RegisterAssociation(filetype);
-                    System.Windows.Forms.MessageBox.Show($" * Registered {filetype}");
-                }
+                FileAssociations.EnsureAssociationsSet(FILETYPES);
+
+                
             }
             catch (Exception e)
             {
-                System.Windows.Forms.MessageBox.Show($"Failed to register associations. ({e.Message})");
+                LogOutput($"Failed to register associations. ({e.Message})");
             }
-            System.Windows.Forms.MessageBox.Show("Done.");
+            LogOutput("Done.");
 
         }
 
@@ -184,7 +191,7 @@ namespace OpenPartFile
 
 
                         ;
-                    MessageBox.Show("File not found.\r\n"+msg);
+                    LogOutput("File not found.\r\n"+msg);
                     throw new FileNotFoundException(msg);
                 }
             }
@@ -195,6 +202,32 @@ namespace OpenPartFile
             }
 
             return filePath;
+        }
+
+        public static void LogOutput(string msg)
+        {
+            switch (OUTPUT_TYPE)
+            {
+                case OutputType.Console:
+                case OutputType.Log:
+                case OutputType.MsgBox:
+                case OutputType.None:
+                    try
+                    {
+                        System.Windows.Forms.MessageBox.Show(msg);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.Print(msg);
+                        Debug.Fail(e.Message,e.InnerException?.Message);
+                    }
+                    break;
+                    
+
+                    default:
+                    break;
+                    
+            }
         }
     }
 }
